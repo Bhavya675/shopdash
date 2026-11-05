@@ -20,14 +20,18 @@ import { ProductService } from '../services/product.service';
   `,
 })
 export class ProductFormComponent {
+  constructor(
+    private fb: FormBuilder,
+    private ps: ProductService,
+    private router: Router,
+  ) {}
+
   form = this.fb.group({
     name: [''],
     price: [''],
     stock: [''],
     description: [''],
   });
-
-  constructor(private fb: FormBuilder, private ps: ProductService, private router: Router) {}
 
   save() {
     const value: any = this.form.value;
