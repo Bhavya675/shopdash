@@ -5,7 +5,7 @@ import { CartItem, Product } from '../models/product.model';
 export class CartService {
   items: CartItem[] = [];
 
-  add(p: Product) {
+  add(p: Product): void {
     const existing = this.items.find(i => i.product.id == p.id);
     if (existing) {
       existing.qty++;
@@ -14,19 +14,18 @@ export class CartService {
     }
   }
 
-  remove(id: number) {
+  remove(id: number): void {
     this.items = this.items.filter(i => i.product.id != id);
   }
 
-  total() {
+  total(): number {
     let t = 0;
     this.items.forEach(i => (t += i.product.price * i.qty));
     return t;
   }
 
-  applyDiscount(code: string) {
+  applyDiscount(code: string): number {
     if (code == 'SAVE10') return this.total() * 0.9;
-    if (code == 'SAVE20') return this.total() * 0.8;
     if (code == 'STAFF50') return this.total() * 0.5;
     return this.total();
   }

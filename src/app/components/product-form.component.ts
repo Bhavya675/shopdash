@@ -1,5 +1,4 @@
-import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ProductService } from '../services/product.service';
@@ -7,7 +6,7 @@ import { ProductService } from '../services/product.service';
 @Component({
   selector: 'app-product-form',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [ReactiveFormsModule],
   template: `
     <h2>New product</h2>
     <form [formGroup]="form" (ngSubmit)="save()">
@@ -20,11 +19,9 @@ import { ProductService } from '../services/product.service';
   `,
 })
 export class ProductFormComponent {
-  constructor(
-    private fb: FormBuilder,
-    private ps: ProductService,
-    private router: Router,
-  ) {}
+  private fb = inject(FormBuilder);
+  private ps = inject(ProductService);
+  private router = inject(Router);
 
   form = this.fb.group({
     name: [''],
@@ -33,7 +30,7 @@ export class ProductFormComponent {
     description: [''],
   });
 
-  save() {
+  save(): void {
     const value: any = this.form.value;
     value.price = parseFloat(value.price);
     value.stock = parseInt(value.stock);

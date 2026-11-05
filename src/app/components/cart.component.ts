@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CartService } from '../services/cart.service';
@@ -11,7 +11,7 @@ import { CartService } from '../services/cart.service';
     <h2>Cart</h2>
     <div *ngFor="let i of cart.items">
       {{ i.product.name }} x {{ i.qty }} = {{ i.product.price * i.qty }}
-      <span (click)="cart.remove(i.product.id)">✕</span>
+      <span (click)="cart.remove(i.product.id)">X</span>
     </div>
     <input [(ngModel)]="code" placeholder="Discount code" />
     <p>Total: {{ cart.applyDiscount(code) | currency }}</p>
@@ -20,12 +20,11 @@ import { CartService } from '../services/cart.service';
   `,
 })
 export class CartComponent {
+  cart = inject(CartService);
   code = '';
   message = '';
 
-  constructor(public cart: CartService) {}
-
-  async checkout() {
+  async checkout(): Promise<void> {
     try {
       this.cart.checkout();
       this.message = 'Order placed!';
