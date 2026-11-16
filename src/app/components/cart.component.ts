@@ -1,7 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { DomSanitizer } from '@angular/platform-browser';
 import { CartService } from '../services/cart.service';
 
 @Component({
@@ -12,11 +11,19 @@ import { CartService } from '../services/cart.service';
     <h2>Cart</h2>
 
     <div *ngFor="let i of cart.items">
-      <span [innerHTML]="getProductNameHtml(i.product.name)"></span>
+      <span>{{ i.product.name }}</span>
 
       x {{ i.qty }} = {{ i.product.price * i.qty }}
 
-      <span (click)="cart.remove(i.product.id)">X</span>
+      <span
+        role="button"
+        tabindex="0"
+        (click)="cart.remove(i.product.id)"
+        (keydown.enter)="cart.remove(i.product.id)"
+        aria-label="Remove product"
+      >
+        X
+      </span>
     </div>
 
     <input [(ngModel)]="code" placeholder="Discount code" />
@@ -30,20 +37,17 @@ import { CartService } from '../services/cart.service';
 })
 export class CartComponent {
   cart = inject(CartService);
-  private sanitizer = inject(DomSanitizer);
 
   code = '';
   message = '';
-
-  getProductNameHtml(name: string) {
-    return this.sanitizer.bypassSecurityTrustHtml(name);
-  }
 
   async checkout(): Promise<void> {
     try {
       this.cart.checkout();
       this.message = 'Order placed!';
       this.cart.items = [];
-    } catch (e) {}
+    } catch (error) {
+      this.message = 'Checkout failed. Please try again.';
+    }
   }
 }
