@@ -43,11 +43,13 @@ export class CartComponent {
 
   async checkout(): Promise<void> {
     try {
-      this.cart.checkout();
+      await this.cart.checkout();
+
       this.message = 'Order placed!';
       this.cart.items = [];
     } catch (error) {
       this.message = 'Checkout failed. Please try again.';
+      console.error('Checkout error:', error);
     }
   }
 }
