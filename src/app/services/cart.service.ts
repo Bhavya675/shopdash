@@ -4,6 +4,11 @@ import { firstValueFrom } from 'rxjs';
 import { CartItem, Product } from '../models/product.model';
 import { environment } from '../../environments/environment';
 
+interface CheckoutItem {
+  productId: number;
+  quantity: number;
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -20,12 +25,15 @@ export class CartService {
       return;
     }
 
-    const existing = this.items.find((i) => i.product.id === p.id);
+    const existing = this.items.find((item) => item.product.id === p.id);
 
     if (existing) {
       existing.qty++;
     } else {
-      this.items.push({ product: p, qty: 1 });
+      this.items.push({
+        product: p,
+        qty: 1,
+      });
     }
   }
 
@@ -34,11 +42,11 @@ export class CartService {
       return;
     }
 
-    this.items = this.items.filter((i) => i.product.id !== id);
+    this.items = this.items.filter((item) => item.product.id !== id);
   }
 
   total(): number {
-    return this.items.reduce((t, i) => t + i.product.price * i.qty, 0);
+    return this.items.reduce((total, item) => total + item.product.price * item.qty, 0);
   }
 
   applyDiscount(code: string): number {
@@ -65,8 +73,10 @@ export class CartService {
     this.isCheckingOut = true;
 
     try {
-      const checkoutItems = this.items.map((item) => ({
-        ...item,
+      // Send only trusted identifiers and requested quantities.
+      const checkoutItems: CheckoutItem[] = this.items.map((item) => ({
+        productId: item.product.id,
+        quantity: item.qty,
       }));
 
       await firstValueFrom(
@@ -75,7 +85,7 @@ export class CartService {
         }),
       );
 
-      // Clear cart only after successful API response.
+      // Clear cart only after successful checkout.
       this.items = [];
     } finally {
       this.isCheckingOut = false;
