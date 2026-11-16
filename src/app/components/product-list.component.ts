@@ -1,11 +1,14 @@
 import { Component, OnInit, OnDestroy, inject } from '@angular/core';
+
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { interval, Subscription } from 'rxjs';
+
 import { ProductService } from '../services/product.service';
 import { AuthService } from '../services/auth.service';
 import { CartService } from '../services/cart.service';
+import { Product } from '../models/product.model';
 
 @Component({
   selector: 'app-product-list',
@@ -23,7 +26,8 @@ import { CartService } from '../services/cart.service';
     <div *ngFor="let p of products">
       <h3>{{ p.name }}</h3>
 
-      <!-- Safely render product description as plain text -->
+      <!-- Product descriptions are rendered as plain text.
+           Never use innerHTML or bypassSecurityTrustHtml here. -->
       <div>{{ p.description }}</div>
 
       <p>{{ p.price | currency }} - stock: {{ p.stock }}</p>
@@ -40,7 +44,7 @@ export class ProductListComponent implements OnInit, OnDestroy {
 
   auth = inject(AuthService);
 
-  products: any[] = [];
+  products: Product[] = [];
   term = '';
 
   private refreshSubscription?: Subscription;
@@ -59,7 +63,7 @@ export class ProductListComponent implements OnInit, OnDestroy {
 
   private loadProducts(): void {
     this.ps.getAll().subscribe({
-      next: (data) => {
+      next: (data: Product[]) => {
         this.products = data;
       },
       error: (error) => {
@@ -70,7 +74,7 @@ export class ProductListComponent implements OnInit, OnDestroy {
 
   onSearch(): void {
     this.ps.search(this.term).subscribe({
-      next: (results) => {
+      next: (results: Product[]) => {
         this.products = results;
       },
       error: (error) => {
@@ -83,8 +87,8 @@ export class ProductListComponent implements OnInit, OnDestroy {
     return this.products.reduce((total, product) => total + product.price * product.stock, 0);
   }
 
-  addToCart(p: any): void {
-    this.cart.add(p);
+  addToCart(product: Product): void {
+    this.cart.add(product);
   }
 
   remove(id: number): void {
@@ -94,7 +98,7 @@ export class ProductListComponent implements OnInit, OnDestroy {
 
     this.ps.delete(id).subscribe({
       next: () => {
-        this.products = this.products.filter((p) => p.id !== id);
+        this.products = this.products.filter((product) => product.id !== id);
       },
       error: (error) => {
         console.error('Failed to delete product:', error);
