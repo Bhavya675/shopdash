@@ -12,20 +12,33 @@ export class ProductService {
   private readonly baseUrl = `${environment.apiUrl}/products`;
 
   getAll() {
-    return this.http.get<Product[]>(this.baseUrl);
+    return this.http.get<Product[]>(this.baseUrl, {
+      withCredentials: true,
+    });
   }
 
   search(term: string) {
     const params = new HttpParams().set('q', term);
 
-    return this.http.get<Product[]>(this.baseUrl, { params });
+    return this.http.get<Product[]>(this.baseUrl, {
+      params,
+      withCredentials: true,
+    });
   }
 
   create(product: Product) {
-    return this.http.post<Product>(this.baseUrl, product);
+    return this.http.post<Product>(this.baseUrl, product, {
+      withCredentials: true,
+    });
   }
 
   delete(id: number) {
-    return this.http.delete<void>(`${this.baseUrl}/${id}`);
+    if (!Number.isInteger(id) || id <= 0) {
+      throw new Error('Invalid product ID.');
+    }
+
+    return this.http.delete<void>(`${this.baseUrl}/${id}`, {
+      withCredentials: true,
+    });
   }
 }
