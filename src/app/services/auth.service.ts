@@ -3,49 +3,72 @@ import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject } from 'rxjs';
 import { environment } from '../../environments/environment';
 
-@Injectable({ providedIn: 'root' })
+interface AuthUser {
+  id: number;
+  email: string;
+  role: string;
+}
+
+interface LoginResponse {
+  user: AuthUser;
+}
+
+@Injectable({
+  providedIn: 'root',
+})
 export class AuthService {
   private http = inject(HttpClient);
 
-  private user$ = new BehaviorSubject<any>(null);
+  private user$ = new BehaviorSubject<AuthUser | null>(null);
 
   constructor() {
-    const saved = localStorage.getItem('user');
+    this.restoreSession();
+  }
 
-    if (saved) {
-      try {
-        this.user$.next(JSON.parse(saved));
-      } catch {
-        localStorage.removeItem('user');
-      }
-    }
+  // Restore the authenticated user using the HttpOnly cookie.
+  restoreSession(): void {
+    this.http
+      .get<AuthUser>(`${environment.apiUrl}/auth/me`, {
+        withCredentials: true,
+      })
+      .subscribe({
+        next: (user) => {
+          this.user$.next(user);
+        },
+        error: () => {
+          this.user$.next(null);
+        },
+      });
   }
 
   login(email: string, password: string): void {
     this.http
-      .post<any>(`${environment.apiUrl}/auth/login`, {
-        email,
-        password,
-      })
-      .subscribe((res) => {
-        localStorage.setItem('token', res.token);
-        localStorage.setItem('user', JSON.stringify(res.user));
-
-        this.user$.next(res.user);
-
-        console.log('Login successful');
+      .post<LoginResponse>(
+        `${environment.apiUrl}/auth/login`,
+        { email, password },
+        { withCredentials: true },
+      )
+      .subscribe({
+        next: (res) => {
+          this.user$.next(res.user);
+          console.log('Login successful');
+        },
+        error: (error) => {
+          console.error('Login failed:', error);
+        },
       });
   }
 
   logout(): void {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-
+    // Clear the local authentication state immediately.
     this.user$.next(null);
-  }
 
-  getToken(): string | null {
-    return localStorage.getItem('token');
+    // Ask the backend to invalidate the session and clear its cookie.
+    this.http.post(`${environment.apiUrl}/auth/logout`, {}, { withCredentials: true }).subscribe({
+      error: (error) => {
+        console.error('Logout request failed:', error);
+      },
+    });
   }
 
   isAdmin(): boolean {
