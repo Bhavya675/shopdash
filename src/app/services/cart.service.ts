@@ -1,4 +1,6 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
 import { CartItem, Product } from '../models/product.model';
 import { environment } from '../../environments/environment';
 
@@ -6,11 +8,18 @@ import { environment } from '../../environments/environment';
   providedIn: 'root',
 })
 export class CartService {
+  private http = inject(HttpClient);
+
   items: CartItem[] = [];
+  isCheckingOut = false;
 
   private readonly ordersApiUrl = `${environment.apiUrl}/orders`;
 
   add(p: Product): void {
+    if (this.isCheckingOut) {
+      return;
+    }
+
     const existing = this.items.find((i) => i.product.id === p.id);
 
     if (existing) {
@@ -21,6 +30,10 @@ export class CartService {
   }
 
   remove(id: number): void {
+    if (this.isCheckingOut) {
+      return;
+    }
+
     this.items = this.items.filter((i) => i.product.id !== id);
   }
 
@@ -41,21 +54,31 @@ export class CartService {
   }
 
   async checkout(): Promise<void> {
+    if (this.isCheckingOut) {
+      throw new Error('Checkout is already in progress.');
+    }
+
     if (this.items.length === 0) {
       throw new Error('Cart is empty.');
     }
 
-    const response = await fetch(this.ordersApiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: JSON.stringify(this.items),
-    });
+    this.isCheckingOut = true;
 
-    if (!response.ok) {
-      throw new Error(`Checkout failed. Server returned status: ${response.status}`);
+    try {
+      const checkoutItems = this.items.map((item) => ({
+        ...item,
+      }));
+
+      await firstValueFrom(
+        this.http.post<void>(this.ordersApiUrl, checkoutItems, {
+          withCredentials: true,
+        }),
+      );
+
+      // Clear cart only after successful API response.
+      this.items = [];
+    } finally {
+      this.isCheckingOut = false;
     }
   }
 }
