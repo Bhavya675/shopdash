@@ -26,8 +26,6 @@ import { Product } from '../models/product.model';
     <div *ngFor="let p of products">
       <h3>{{ p.name }}</h3>
 
-      <!-- Product descriptions are rendered as plain text.
-           Never use innerHTML or bypassSecurityTrustHtml here. -->
       <div>{{ p.description }}</div>
 
       <p>{{ p.price | currency }} - stock: {{ p.stock }}</p>
@@ -36,6 +34,8 @@ import { Product } from '../models/product.model';
 
       <button type="button" *ngIf="auth.isAdmin()" (click)="remove(p.id)">Delete</button>
     </div>
+
+    <p *ngIf="message" role="alert">{{ message }}</p>
   `,
 })
 export class ProductListComponent implements OnInit, OnDestroy {
@@ -46,6 +46,7 @@ export class ProductListComponent implements OnInit, OnDestroy {
 
   products: Product[] = [];
   term = '';
+  message = '';
 
   private refreshSubscription?: Subscription;
 
@@ -63,7 +64,7 @@ export class ProductListComponent implements OnInit, OnDestroy {
 
   private loadProducts(): void {
     this.ps.getAll().subscribe({
-      next: (data: Product[]) => {
+      next: (data) => {
         this.products = data;
       },
       error: (error) => {
@@ -74,7 +75,7 @@ export class ProductListComponent implements OnInit, OnDestroy {
 
   onSearch(): void {
     this.ps.search(this.term).subscribe({
-      next: (results: Product[]) => {
+      next: (results) => {
         this.products = results;
       },
       error: (error) => {
@@ -93,15 +94,28 @@ export class ProductListComponent implements OnInit, OnDestroy {
 
   remove(id: number): void {
     if (!this.auth.isAdmin()) {
+      this.message = 'You are not authorized to delete products.';
       return;
     }
+
+    this.message = '';
 
     this.ps.delete(id).subscribe({
       next: () => {
         this.products = this.products.filter((product) => product.id !== id);
+
+        this.message = 'Product deleted successfully.';
       },
       error: (error) => {
-        console.error('Failed to delete product:', error);
+        if (error.status === 401) {
+          this.message = 'Please log in to continue.';
+        } else if (error.status === 403) {
+          this.message = 'You are not authorized to delete products.';
+        } else {
+          this.message = 'Failed to delete product.';
+        }
+
+        console.error('Product deletion failed:', error);
       },
     });
   }
