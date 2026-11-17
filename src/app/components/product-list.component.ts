@@ -1,8 +1,8 @@
 import { Component, OnInit, OnDestroy, inject } from '@angular/core';
-
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { HttpErrorResponse } from '@angular/common/http';
 import { interval, Subscription } from 'rxjs';
 
 import { ProductService } from '../services/product.service';
@@ -32,56 +32,75 @@ import { Product } from '../models/product.model';
 
       <button type="button" (click)="addToCart(p)">Add to cart</button>
 
-      <button type="button" *ngIf="auth.isAdmin()" (click)="remove(p.id)">Delete</button>
+      <button
+        *ngIf="auth.isAdmin()"
+        type="button"
+        [disabled]="deletingIds.has(p.id)"
+        (click)="remove(p.id)"
+      >
+        {{ deletingIds.has(p.id) ? 'Deleting...' : 'Delete' }}
+      </button>
     </div>
 
-    <p *ngIf="message" role="alert">{{ message }}</p>
+    <p *ngIf="message" role="status">
+      {{ message }}
+    </p>
   `,
 })
 export class ProductListComponent implements OnInit, OnDestroy {
-  private ps = inject(ProductService);
-  private cart = inject(CartService);
+  private readonly ps = inject(ProductService);
+  private readonly cart = inject(CartService);
 
-  auth = inject(AuthService);
+  readonly auth = inject(AuthService);
 
   products: Product[] = [];
   term = '';
   message = '';
 
-  private refreshSubscription?: Subscription;
+  deletingIds = new Set<number>();
+
+  private readonly subscriptions = new Subscription();
 
   ngOnInit(): void {
     this.loadProducts();
 
-    this.refreshSubscription = interval(30000).subscribe(() => {
-      this.loadProducts();
-    });
+    this.subscriptions.add(
+      interval(30000).subscribe(() => {
+        if (!this.term.trim()) {
+          this.loadProducts();
+        }
+      }),
+    );
   }
 
   ngOnDestroy(): void {
-    this.refreshSubscription?.unsubscribe();
+    this.subscriptions.unsubscribe();
   }
 
   private loadProducts(): void {
-    this.ps.getAll().subscribe({
-      next: (data) => {
+    const subscription = this.ps.getAll().subscribe({
+      next: (data: Product[]) => {
         this.products = data;
       },
-      error: (error) => {
-        console.error('Failed to load products:', error);
+      error: () => {
+        this.message = 'Failed to load products.';
       },
     });
+
+    this.subscriptions.add(subscription);
   }
 
   onSearch(): void {
-    this.ps.search(this.term).subscribe({
-      next: (results) => {
+    const subscription = this.ps.search(this.term).subscribe({
+      next: (results: Product[]) => {
         this.products = results;
       },
-      error: (error) => {
-        console.error('Product search failed:', error);
+      error: () => {
+        this.message = 'Product search failed.';
       },
     });
+
+    this.subscriptions.add(subscription);
   }
 
   getTotalValue(): number {
@@ -98,15 +117,23 @@ export class ProductListComponent implements OnInit, OnDestroy {
       return;
     }
 
+    if (this.deletingIds.has(id)) {
+      return;
+    }
+
+    this.deletingIds.add(id);
     this.message = '';
 
-    this.ps.delete(id).subscribe({
+    const subscription = this.ps.delete(id).subscribe({
       next: () => {
         this.products = this.products.filter((product) => product.id !== id);
 
+        this.deletingIds.delete(id);
         this.message = 'Product deleted successfully.';
       },
-      error: (error) => {
+      error: (error: HttpErrorResponse) => {
+        this.deletingIds.delete(id);
+
         if (error.status === 401) {
           this.message = 'Please log in to continue.';
         } else if (error.status === 403) {
@@ -114,9 +141,9 @@ export class ProductListComponent implements OnInit, OnDestroy {
         } else {
           this.message = 'Failed to delete product.';
         }
-
-        console.error('Product deletion failed:', error);
       },
     });
+
+    this.subscriptions.add(subscription);
   }
 }
