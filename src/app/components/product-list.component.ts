@@ -28,7 +28,7 @@ import { Product } from '../models/product.model';
       <h3>{{ p.name }}</h3>
 
       <!-- Explicitly bind to innerHTML with sanitized content -->
-      <div [innerHTML]="sanitizeHtml(p.description)"></div>
+      <div>{{ p.description }}</div>
 
       <p>{{ p.price | currency }} stock: {{ p.stock }}</p>
 
