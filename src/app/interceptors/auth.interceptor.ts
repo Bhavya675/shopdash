@@ -1,4 +1,5 @@
-import { HttpInterceptorFn } from '@angular/common/http';
+import { HttpInterceptorFn, HttpXsrfTokenExtractor } from '@angular/common/http';
+import { inject } from '@angular/core';
 import { environment } from '../../environments/environment';
 
 const API_ORIGIN = new URL(environment.apiUrl).origin;
@@ -6,7 +7,7 @@ const API_ORIGIN = new URL(environment.apiUrl).origin;
 const SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS'];
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
-  let request = req;
+  const csrfTokenExtractor = inject(HttpXsrfTokenExtractor);
 
   let requestOrigin: string;
 
@@ -21,14 +22,14 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     return next(req);
   }
 
-  // Send HttpOnly authentication cookies only to our API.
-  request = req.clone({
+  // Send authentication cookies only to our API.
+  let request = req.clone({
     withCredentials: true,
   });
 
-  // Add CSRF protection header to state-changing requests.
+  // Add CSRF protection to state-changing requests.
   if (!SAFE_METHODS.includes(req.method.toUpperCase())) {
-    const csrfToken = thisGetCsrfToken();
+    const csrfToken = csrfTokenExtractor.getToken();
 
     if (csrfToken) {
       request = request.clone({
@@ -41,9 +42,3 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
   return next(request);
 };
-
-function thisGetCsrfToken(): string | null {
-  const match = document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]*)/);
-
-  return match ? decodeURIComponent(match[1]) : null;
-}
