@@ -27,7 +27,8 @@ import { Product } from '../models/product.model';
     <div *ngFor="let p of products">
       <h3>{{ p.name }}</h3>
 
-      <div>{{ p.description }}</div>
+      <!-- Text-only binding: Angular never parses this as HTML -->
+      <div [textContent]="p.description"></div>
 
       <p>{{ p.price | currency }} stock: {{ p.stock }}</p>
 
