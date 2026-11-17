@@ -1,9 +1,10 @@
-import { Component, OnInit, OnDestroy, inject, SecurityContext } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { interval, Subscription } from 'rxjs';
+import { Subject, debounceTime, distinctUntilChanged, switchMap } from 'rxjs';
 
 import { ProductService } from '../services/product.service';
 import { AuthService } from '../services/auth.service';
@@ -71,6 +72,18 @@ export class ProductListComponent implements OnInit, OnDestroy {
         }
       }),
     );
+    this.subscriptions.add(
+      this.search$
+        .pipe(
+          debounceTime(300),
+          distinctUntilChanged(),
+          switchMap((term) => this.ps.search(term)),
+        )
+        .subscribe({
+          next: (results) => (this.products = results),
+          error: () => (this.message = 'Product search failed.'),
+        }),
+    );
   }
 
   ngOnDestroy(): void {
@@ -89,18 +102,10 @@ export class ProductListComponent implements OnInit, OnDestroy {
 
     this.subscriptions.add(subscription);
   }
+  private readonly search$ = new Subject<string>();
 
   onSearch(): void {
-    const subscription = this.ps.search(this.term).subscribe({
-      next: (results: Product[]) => {
-        this.products = results;
-      },
-      error: () => {
-        this.message = 'Product search failed.';
-      },
-    });
-
-    this.subscriptions.add(subscription);
+    this.search$.next(this.term);
   }
 
   getTotalValue(): number {
