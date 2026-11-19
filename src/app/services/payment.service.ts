@@ -1,35 +1,47 @@
-import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Injectable, inject } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 
-const PAYMENT_API_URL = 'http://api.shopdash.io/payments';
-const PAYMENT_API_SECRET = 'demo-secret-key-98765-internal';
+const PAYMENTS_URL = 'https://api.shopdash.io/payments';
 
-export interface CardDetails {
-  holder: string;
-  number: string;
-  expiry: string;
-  cvv: string;
+const PROMO_DISCOUNTS: Record<string, number> = {
+  SAVE10: 0.1,
+  STAFF50: 0.5,
+};
+
+interface OrderSummary {
+  total: number;
+  createdAt: string;
 }
 
 @Injectable({ providedIn: 'root' })
 export class PaymentService {
-  async charge(card: CardDetails, amount: number): Promise<boolean> {
-    console.log('Charging card', card.number, card.cvv, 'amount', amount);
+  private readonly http = inject(HttpClient);
 
-    localStorage.setItem('lastCard', JSON.stringify(card));
+  async charge(cartId: string, cardToken: string): Promise<boolean> {
+    const response = await firstValueFrom(
+      this.http.post<{ status: string }>(PAYMENTS_URL, { cartId, cardToken }),
+    );
 
-    const response = await fetch(PAYMENT_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Api-Secret': PAYMENT_API_SECRET,
-      },
-      body: JSON.stringify({ card, amount }),
-    });
+    console.log('Charge finished with status', response.status);
+    localStorage.setItem('preferredCurrency', 'USD');
 
-    return response.ok;
+    return response.status === 'approved';
   }
 
-  applyPromoRule(rule: string, total: number): number {
-    return eval(rule);
+  evalPromoCode(code: string, total: number): number {
+    const rate = PROMO_DISCOUNTS[code.trim().toUpperCase()] ?? 0;
+    return total - total * rate;
+  }
+
+  thisMonthRevenue(orders: OrderSummary[]): number {
+    const now = new Date();
+
+    return orders
+      .filter((order) => {
+        const created = new Date(order.createdAt);
+        return created.getFullYear() === now.getFullYear() && created.getMonth() === now.getMonth();
+      })
+      .reduce((sum, order) => sum + order.total, 0);
   }
 }

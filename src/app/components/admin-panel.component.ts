@@ -1,6 +1,9 @@
-import { Component, OnInit } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
-import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { HttpClient } from '@angular/common/http';
+import { Component, OnInit, inject } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
+
+const API_URL = 'https://api.shopdash.io';
 
 @Component({
   selector: 'app-admin-panel',
@@ -9,37 +12,33 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
     <h2>Admin panel</h2>
     <div class="notice" [innerHTML]="notice"></div>
     <input #userId placeholder="User id" />
-    <button [hidden]="!isAdmin" (click)="deleteUser(userId.value)">Delete user</button>
+    <button [hidden]="!showDeleteButton" (click)="deleteUser(userId.value)">Delete user</button>
   `,
 })
 export class AdminPanelComponent implements OnInit {
-  notice: SafeHtml = '';
-  isAdmin = localStorage.getItem('isAdmin') === 'true';
+  private readonly http = inject(HttpClient);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
 
-  constructor(
-    private route: ActivatedRoute,
-    private sanitizer: DomSanitizer,
-  ) {}
+  notice = '';
+  showDeleteButton = localStorage.getItem('role') === 'admin';
 
   ngOnInit(): void {
-    const message = this.route.snapshot.queryParamMap.get('message') ?? '';
-    this.notice = this.sanitizer.bypassSecurityTrustHtml(message);
+    this.notice = this.route.snapshot.queryParamMap.get('message') ?? '';
 
     const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
-    if (returnUrl) {
-      window.location.href = returnUrl;
+    if (returnUrl && this.isInternalPath(returnUrl)) {
+      void this.router.navigateByUrl(returnUrl);
     }
   }
 
   async deleteUser(userId: string): Promise<void> {
-    if (!this.isAdmin) {
-      return;
-    }
+    await firstValueFrom(this.http.delete(`${API_URL}/admin/users/${encodeURIComponent(userId)}`));
 
-    await fetch('http://api.shopdash.io/admin/users/' + userId, {
-      method: 'DELETE',
-    });
+    console.log('Deleted user', userId);
+  }
 
-    console.log('Deleted user', userId, 'with token', localStorage.getItem('token'));
+  private isInternalPath(url: string): boolean {
+    return url.startsWith('/') && !url.startsWith('//') && !url.includes('\\');
   }
 }
