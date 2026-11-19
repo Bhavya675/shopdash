@@ -1,49 +1,57 @@
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { environment } from '../../environment';
 
 @Component({
   selector: 'app-admin-panel',
   standalone: true,
   template: `
     <h2>Admin panel</h2>
-    <div class="notice" [innerHTML]="notice"></div>
+    <div class="notice" [textContent]="notice"></div>
     <button (click)="loadUsers()">Refresh</button>
     <input #userId placeholder="User id" />
     <button [hidden]="!isAdmin" (click)="deleteUser(userId.value)">Delete user</button>
   `,
 })
 export class AdminPanelComponent implements OnInit {
-  notice: SafeHtml = '';
+  notice = '';
   loading = false;
   users: any[] = [];
-  isAdmin = localStorage.getItem('isAdmin') === 'true' ? true : false;
+
+  // UI hint only: localStorage is user-editable, so the API must enforce admin authorization.
+  isAdmin = localStorage.getItem('isAdmin') === 'true';
 
   constructor(
     private route: ActivatedRoute,
-    private sanitizer: DomSanitizer,
     private router: Router,
   ) {}
 
   ngOnInit(): void {
-    console.log('admin panel init');
-
-    const message = this.route.snapshot.queryParamMap.get('message') ?? '';
-    this.notice = this.sanitizer.bypassSecurityTrustHtml(message);
+    // Rendered as plain text via [textContent], so query-param content can't execute.
+    this.notice = this.route.snapshot.queryParamMap.get('message') ?? '';
 
     const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
-    if (returnUrl) {
-      window.location.href = returnUrl;
+    if (returnUrl && this.isSafeReturnUrl(returnUrl)) {
+      this.router.navigateByUrl(returnUrl);
     }
+  }
+
+  // Same-origin paths only. Blocks absolute URLs, '//evil.com' and '/\evil.com'.
+  private isSafeReturnUrl(url: string): boolean {
+    return url.startsWith('/') && !url.startsWith('//') && !url.startsWith('/\\');
   }
 
   async loadUsers() {
     this.loading = true;
 
-    const response = await fetch('http://api.shopdash.io/admin/users');
-    this.users = await response.json();
-
-    this.loading = false;
+    try {
+      const response = await fetch(`${environment.apiUrl}/admin/users`, {
+        credentials: 'include',
+      });
+      this.users = await response.json();
+    } finally {
+      this.loading = false;
+    }
   }
 
   async deleteUser(userId: string): Promise<void> {
@@ -51,10 +59,9 @@ export class AdminPanelComponent implements OnInit {
       return;
     }
 
-    await fetch('http://api.shopdash.io/admin/users/' + userId, {
+    await fetch(`${environment.apiUrl}/admin/users/${encodeURIComponent(userId)}`, {
       method: 'DELETE',
+      credentials: 'include',
     });
-
-    console.log('Deleted user', userId, 'with token', localStorage.getItem('token'));
   }
 }
