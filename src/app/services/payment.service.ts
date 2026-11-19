@@ -12,23 +12,23 @@ const PROMO_RULES = new Map<string, (total: number) => number>([
   ['FIVE_OFF', (total) => Math.max(0, total - 5)],
 ]);
 
-export interface CardDetails {
-  holder: string;
-  number: string;
-  expiry: string;
-  cvv: string;
-}
-
 @Injectable({ providedIn: 'root' })
 export class PaymentService {
   private readonly http = inject(HttpClient);
 
-  async charge(card: CardDetails, amount: number): Promise<boolean> {
-    // Never log or persist card data (PAN, CVV, expiry) client-side.
-    // The API secret is attached by the backend, not the browser.
+  /**
+   * Charges a payment using a one-time token issued by the payment provider's
+   * hosted fields (e.g. Stripe Elements). Card numbers, expiry and CVV are entered
+   * in the provider's iframe, so they never reach this app or our API.
+   */
+  async charge(paymentToken: string, amount: number): Promise<boolean> {
+    if (!paymentToken || !Number.isFinite(amount) || amount <= 0) {
+      return false;
+    }
+
     try {
       const response = await firstValueFrom(
-        this.http.post(PAYMENT_API_URL, { card, amount }, { observe: 'response' }),
+        this.http.post(PAYMENT_API_URL, { paymentToken, amount }, { observe: 'response' }),
       );
       return response.ok;
     } catch {

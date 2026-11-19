@@ -1,30 +1,41 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
+import { NgIf } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
+import { AuthService } from '../services/auth.service';
 import { environment } from '../../environment';
+
+interface AdminUser {
+  id: string | number;
+  [key: string]: unknown;
+}
 
 @Component({
   selector: 'app-admin-panel',
   standalone: true,
+  imports: [NgIf],
   template: `
     <h2>Admin panel</h2>
     <div class="notice" [textContent]="notice"></div>
-    <button (click)="loadUsers()">Refresh</button>
+    <button type="button" (click)="loadUsers()">Refresh</button>
     <input #userId placeholder="User id" />
-    <button [hidden]="!isAdmin" (click)="deleteUser(userId.value)">Delete user</button>
+    <button *ngIf="isAdmin" type="button" (click)="deleteUser(userId.value)">Delete user</button>
   `,
 })
 export class AdminPanelComponent implements OnInit {
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  private readonly http = inject(HttpClient);
+  private readonly auth = inject(AuthService);
+
   notice = '';
   loading = false;
-  users: any[] = [];
+  users: AdminUser[] = [];
 
-  // UI hint only: localStorage is user-editable, so the API must enforce admin authorization.
-  isAdmin = localStorage.getItem('isAdmin') === 'true';
-
-  constructor(
-    private route: ActivatedRoute,
-    private router: Router,
-  ) {}
+  get isAdmin(): boolean {
+    return this.auth.isAdmin();
+  }
 
   ngOnInit(): void {
     // Rendered as plain text via [textContent], so query-param content can't execute.
@@ -41,27 +52,34 @@ export class AdminPanelComponent implements OnInit {
     return url.startsWith('/') && !url.startsWith('//') && !url.startsWith('/\\');
   }
 
-  async loadUsers() {
+  async loadUsers(): Promise<void> {
     this.loading = true;
 
     try {
-      const response = await fetch(`${environment.apiUrl}/admin/users`, {
-        credentials: 'include',
-      });
-      this.users = await response.json();
+      this.users = await firstValueFrom(
+        this.http.get<AdminUser[]>(`${environment.apiUrl}/admin/users`),
+      );
+    } catch {
+      this.notice = 'Failed to load users.';
     } finally {
       this.loading = false;
     }
   }
 
   async deleteUser(userId: string): Promise<void> {
-    if (!this.isAdmin) {
+    const id = userId.trim();
+    if (!this.isAdmin || !id) {
       return;
     }
 
-    await fetch(`${environment.apiUrl}/admin/users/${encodeURIComponent(userId)}`, {
-      method: 'DELETE',
-      credentials: 'include',
-    });
+    try {
+      await firstValueFrom(
+        this.http.delete(`${environment.apiUrl}/admin/users/${encodeURIComponent(id)}`),
+      );
+      this.users = this.users.filter((user) => String(user.id) !== id);
+      this.notice = 'User deleted.';
+    } catch {
+      this.notice = 'Failed to delete user.';
+    }
   }
 }
